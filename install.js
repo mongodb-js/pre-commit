@@ -5,8 +5,8 @@ var fs = require('fs'),
   path = require('path'),
   os = require('os'),
   hook = path.join(__dirname, 'hook'),
-  // , root = path.resolve(__dirname, '..', '..')
-  root = process.cwd(),
+  root = path.resolve(__dirname, '..', '..'),
+  // root = process.cwd(),
   exists = fs.existsSync || path.existsSync;
 
 //
