@@ -1,10 +1,10 @@
 'use strict';
 
-var spawn = require('cross-spawn')
-  , which = require('which')
-  , path = require('path')
-  , util = require('util')
-  , tty = require('tty');
+var spawn = require('cross-spawn'),
+  which = require('which'),
+  path = require('path'),
+  util = require('util'),
+  tty = require('tty');
 
 /**
  * Representation of a hook runner.
@@ -18,14 +18,14 @@ function Hook(fn, options) {
   if (!this) return new Hook(fn, options);
   options = options || {};
 
-  this.options = options;     // Used for testing only. Ignore this. Don't touch.
-  this.config = {};           // pre-commit configuration from the `package.json`.
-  this.json = {};             // Actual content of the `package.json`.
-  this.npm = '';              // The location of the `npm` binary.
-  this.git = '';              // The location of the `git` binary.
-  this.root = '';             // The root location of the .git folder.
-  this.status = '';           // Contents of the `git status`.
-  this.exit = fn;             // Exit function.
+  this.options = options; // Used for testing only. Ignore this. Don't touch.
+  this.config = {}; // pre-commit configuration from the `package.json`.
+  this.json = {}; // Actual content of the `package.json`.
+  this.npm = ''; // The location of the `npm` binary.
+  this.git = ''; // The location of the `git` binary.
+  this.root = ''; // The root location of the .git folder.
+  this.status = ''; // Contents of the `git status`.
+  this.exit = fn; // Exit function.
 
   this.initialize();
 }
@@ -77,15 +77,17 @@ Hook.prototype.exec = function exec(bin, args) {
  * @api private
  */
 Hook.prototype.parse = function parse() {
-  var pre = this.json['pre-commit'] || this.json.precommit
-    , config = !Array.isArray(pre) && 'object' === typeof pre ? pre : {};
+  var pre = this.json['pre-commit'] || this.json.precommit || 'check',
+    config = !Array.isArray(pre) && 'object' === typeof pre ? pre : {};
 
   ['silent', 'colors', 'template'].forEach(function each(flag) {
     var value;
 
     if (flag in config) value = config[flag];
-    else if ('precommit.'+ flag in this.json) value = this.json['precommit.'+ flag];
-    else if ('pre-commit.'+ flag in this.json) value = this.json['pre-commit.'+ flag];
+    else if ('precommit.' + flag in this.json)
+      value = this.json['precommit.' + flag];
+    else if ('pre-commit.' + flag in this.json)
+      value = this.json['pre-commit.' + flag];
     else return;
 
     config[flag] = value;
@@ -98,10 +100,10 @@ Hook.prototype.parse = function parse() {
 
   if ('string' === typeof config.run) config.run = config.run.split(/[, ]+/);
   if (
-       !Array.isArray(config.run)
-    && this.json.scripts
-    && this.json.scripts.test
-    && this.json.scripts.test !== 'echo "Error: no test specified" && exit 1'
+    !Array.isArray(config.run) &&
+    this.json.scripts &&
+    this.json.scripts.test &&
+    this.json.scripts.test !== 'echo "Error: no test specified" && exit 1'
   ) {
     config.run = ['test'];
   }
@@ -120,21 +122,20 @@ Hook.prototype.log = function log(lines, exit) {
   if (!Array.isArray(lines)) lines = lines.split('\n');
   if ('number' !== typeof exit) exit = 1;
 
-  var prefix = this.colors
-  ? '\u001b[38;5;166mpre-commit:\u001b[39;49m '
-  : 'pre-commit: ';
+  var prefix = '';
 
-  lines.push('');     // Whitespace at the end of the log.
-  lines.unshift('');  // Whitespace at the beginning.
+  lines.push(''); // Whitespace at the end of the log.
+  lines.unshift(''); // Whitespace at the beginning.
 
   lines = lines.map(function map(line) {
     return prefix + line;
   });
 
-  if (!this.silent) lines.forEach(function output(line) {
-    if (exit) console.error(line);
-    else console.log(line);
-  });
+  if (!this.silent)
+    lines.forEach(function output(line) {
+      if (exit) console.error(line);
+      else console.log(line);
+    });
 
   this.exit(exit, lines);
   return exit === 0;
@@ -148,8 +149,9 @@ Hook.prototype.log = function log(lines, exit) {
  */
 Hook.prototype.initialize = function initialize() {
   ['git', 'npm'].forEach(function each(binary) {
-    try { this[binary] = which.sync(binary); }
-    catch (e) {}
+    try {
+      this[binary] = which.sync(binary);
+    } catch (e) {}
   }, this);
 
   //
@@ -182,7 +184,9 @@ Hook.prototype.initialize = function initialize() {
   try {
     this.json = require(path.join(this.root, 'package.json'));
     this.parse();
-  } catch (e) { return this.log(this.format(Hook.log.json, e.message), 0); }
+  } catch (e) {
+    return this.log(this.format(Hook.log.json, e.message), 0);
+  }
 
   //
   // We can only check for changes after we've parsed the package.json as it
@@ -230,7 +234,8 @@ Hook.prototype.run = function runner() {
       cwd: hooked.root,
       stdio: [0, 1, 2]
     }).once('close', function closed(code) {
-      if (code) return hooked.log(hooked.format(Hook.log.failure, script, code));
+      if (code)
+        return hooked.log(hooked.format(Hook.log.failure, script, code));
 
       again(scripts);
     });
@@ -253,48 +258,27 @@ Hook.prototype.format = util.format;
  * @private
  */
 Hook.log = {
-  binary: [
-    'Failed to locate the `%s` binary, make sure it\'s installed in your $PATH.',
-    'Skipping the pre-commit hook.'
-  ].join('\n'),
+  binary: 'pre-commit skipped. Failed to locate the `%s` binary.',
 
-  status: [
-    'Failed to retrieve the `git status` from the project.',
-    'Skipping the pre-commit hook.'
-  ].join('\n'),
+  status: 'pre-commit skipped. `git status` failed.',
 
-  root: [
-    'Failed to find the root of this git repository, cannot locate the `package.json`.',
-    'Skipping the pre-commit hook.'
-  ].join('\n'),
+  root: 'pre-commit skipped. Cannot locate the `package.json`.',
 
-  empty: [
-    'No changes detected.',
-    'Skipping the pre-commit hook.'
-  ].join('\n'),
+  empty: 'pre-commit skipped. No changes detected.',
 
-  json: [
-    'Received an error while parsing or locating the `package.json` file:',
-    '',
-    '  %s',
-    '',
-    'Skipping the pre-commit hook.'
-  ].join('\n'),
+  json: ['pre-commit skipped. package.json file has errors:', '', '  %s'].join(
+    '\n'
+  ),
 
-  run: [
-    'We have nothing pre-commit hooks to run. Either you\'re missing the `scripts`',
-    'in your `package.json` or have configured pre-commit to run nothing.',
-    'Skipping the pre-commit hook.'
-  ].join('\n'),
+  run: 'pre-commit skipped. Ask lucas@mongodb.com',
 
   failure: [
-    'We\'ve failed to pass the specified git pre-commit hooks as the `%s`',
-    'hook returned an exit code (%d). If you\'re feeling adventurous you can',
-    'skip the git pre-commit hooks by adding the following flags to your commit:',
+    "pre-commit failed but you're doing great.",
     '',
-    '  git commit -n (or --no-verify)',
-    '',
-    'This is ill-advised since the commit is broken.'
+    'Want to skip this and get on with your day?',
+    'You can run `git commit` again with the `--no-verify` option',
+    '                    __or__',
+    'Just disable this feature by removing the file `rm .git/hooks/pre-commit`'
   ].join('\n')
 };
 
